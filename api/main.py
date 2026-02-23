@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Import from parent - run from project root
 import sys
@@ -21,9 +22,10 @@ from dos_primary_segment.outputs import build_included_results
 from dos_primary_segment.api_data import build_api_response
 
 app = FastAPI(title="DOS Primary Segment Tool", version="1.0.0")
+# CORS: allow all for deployment (same-origin when served from API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -118,3 +120,27 @@ async def process_dos(
         )
         response["is_preliminary"] = use_preliminary
         return response
+
+
+# Serve built frontend in production (when web/dist exists)
+_dist = Path(__file__).resolve().parent.parent / "web" / "dist"
+if not _dist.exists():
+    _dist = Path("/app/web/dist")
+
+if _dist.exists():
+    from fastapi.responses import FileResponse
+
+    app.mount("/assets", StaticFiles(directory=_dist / "assets"), name="assets")
+
+    @app.get("/")
+    def serve_root():
+        return FileResponse(_dist / "index.html")
+
+    @app.get("/{path:path}")
+    def serve_spa(path: str):
+        if path.startswith("api"):
+            raise HTTPException(404)
+        file = _dist / path
+        if file.exists() and file.is_file():
+            return FileResponse(file)
+        return FileResponse(_dist / "index.html")
