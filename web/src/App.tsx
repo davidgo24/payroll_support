@@ -193,6 +193,20 @@ function App() {
   const [confirmApply, setConfirmApply] = useState(false)
   const [exportModal, setExportModal] = useState<{ show: true } | null>(null)
 
+  // Dark mode: persist in localStorage
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme')
+      if (saved) return saved === 'dark'
+      return window.matchMedia('(prefers-color-scheme: dark)').matches
+    }
+    return false
+  })
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
+
 
   const updateRow = useCallback((index: number, updates: Partial<Row>) => {
     if (!data) return
@@ -286,7 +300,13 @@ function App() {
   return (
     <div className="app">
       <div className="left-panel">
-        <h2>DOS Primary Segment</h2>
+        <div className="panel-header">
+          <h2>DOS Primary Segment</h2>
+          <div className="theme-toggle-wrap">
+            <span className="theme-icon">{darkMode ? '🌙' : '☀️'}</span>
+            <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode" title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} />
+          </div>
+        </div>
         {data?.is_preliminary && <p className="prelim-badge">📋 Preliminary (projected)</p>}
         <div className="upload-zone"
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('dragover') }}
@@ -301,7 +321,7 @@ function App() {
         >
           <input id="dos-input" type="file" accept=".pdf,.txt,.csv,.xlsx,.xls" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setDosFile(f); setPreliminaryDosFile(null) } else setDosFile(null) }} />
           <strong>Final DOS (actual hours)</strong>
-          <p style={{ margin: '4px 0', fontSize: 13, color: '#333' }}>{dosFile?.name ?? 'Drop or click'}</p>
+          <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-label)' }}>{dosFile?.name ?? 'Drop or click'}</p>
         </div>
         <div className="upload-zone preliminary-zone"
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('dragover') }}
@@ -316,20 +336,20 @@ function App() {
         >
           <input id="prelim-input" type="file" accept=".pdf,.txt,.csv,.xlsx,.xls" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPreliminaryDosFile(f); setDosFile(null) } else setPreliminaryDosFile(null) }} />
           <strong>Preliminary DOS (projected hours)</strong>
-          <p style={{ margin: '4px 0', fontSize: 13, color: '#333' }}>{preliminaryDosFile?.name ?? 'Drop or click'}</p>
+          <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-label)' }}>{preliminaryDosFile?.name ?? 'Drop or click'}</p>
         </div>
         <div className="upload-zone" onClick={() => document.getElementById('cte-input')?.click()}>
           <input id="cte-input" type="file" accept=".csv,.xlsx,.xls" onChange={(e) => setCteFile(e.target.files?.[0] ?? null)} />
           <strong>CTE Config (optional)</strong>
-          <p style={{ margin: '4px 0', fontSize: 13, color: '#333' }}>{cteFile?.name ?? 'Drop or click'}</p>
+          <p style={{ margin: '4px 0', fontSize: 13, color: 'var(--text-label)' }}>{cteFile?.name ?? 'Drop or click'}</p>
         </div>
         <div className="filter-group">
           <label>Work date override</label>
           <input type="text" placeholder="e.g. 02/12/2026" value={workDateOverride} onChange={(e) => setWorkDateOverride(e.target.value)}
-            style={{ width: '100%', padding: 10, borderRadius: 4, border: '1px solid #666', fontSize: 14, color: '#1a1a1a' }} />
+            style={{ width: '100%', padding: 10, borderRadius: 4, border: '1px solid var(--border-input)', fontSize: 14, color: 'var(--text-primary)', background: 'var(--bg-input)' }} />
         </div>
         <button onClick={handleProcess} disabled={loading || (!dosFile && !preliminaryDosFile)}
-          style={{ width: '100%', padding: '12px', background: loading ? '#666' : '#333', color: '#fff', border: 'none', borderRadius: 6, cursor: loading ? 'wait' : 'pointer', fontWeight: 600 }}>
+          style={{ width: '100%', padding: '12px', background: loading ? 'var(--text-muted)' : 'var(--accent-primary)', color: '#fff', border: 'none', borderRadius: 6, cursor: loading ? 'wait' : 'pointer', fontWeight: 600 }}>
           {loading ? 'Processing…' : 'Process DOS'}
         </button>
         {data && (
@@ -380,10 +400,10 @@ function App() {
                 const bucketIds = new Set(data.rows.map((r) => r.packet.emp_id))
                 const missing = pdfAll.filter((id) => !bucketIds.has(id))
                 if (missing.length === 0) {
-                  return <p style={{ color: '#1a5a1a', fontWeight: 600 }}>✓ All {pdfAll.length} names accounted for</p>
+                  return <p style={{ color: 'var(--accent-green)', fontWeight: 600 }}>✓ All {pdfAll.length} names accounted for</p>
                 }
                 return (
-                  <p style={{ color: '#8b1a1a', fontWeight: 600 }}>
+                  <p style={{ color: 'var(--accent-red)', fontWeight: 600 }}>
                     Missing from buckets: {missing.length} — verify PDF
                   </p>
                 )
@@ -399,7 +419,7 @@ function App() {
               >
                 Export completed to CSV (UTF-8)
               </button>
-              <p style={{ fontSize: 11, color: '#666', marginTop: 4 }}>One row per segment: emp_number, date_in, date_out, time_in, time_out, labor_code.</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>One row per segment: emp_number, date_in, date_out, time_in, time_out, labor_code.</p>
             </div>
           </>
         )}
@@ -434,9 +454,9 @@ function App() {
                       <td><strong>{row.packet.emp_id}</strong>{row.emp_id_modified && <span title="Emp # corrected"> ✏️</span>}</td>
                       <td>{row.packet.employee_name}</td>
                       <td><span className={`bucket-badge bucket-${row.bucket}`}>{bucketLabels[row.bucket] || row.bucket}</span></td>
-                      <td>{row.cte_preferred ? <span style={{ color: '#0d5a0d', fontWeight: 700 }}>✓ CTE</span> : '—'}</td>
+                      <td>{row.cte_preferred ? <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>✓ CTE</span> : '—'}</td>
                       <td><span className={`type-badge type-${row.type}`}>{row.type}</span></td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#1a1a1a' }}>{row.packet.scheduled_end_time} / {row.packet.actual_end_time}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: 13, color: 'var(--text-primary)' }}>{row.packet.scheduled_end_time} / {row.packet.actual_end_time}</td>
                       <td className={`status-${row.status}`}>{statusLabels[row.status] || row.status}</td>
                       <td>{row.packet.potential_bleed && (
                         <span className="bleed-badge" title="Possible PDF row bleed — verify notes">⚠️ BLEED</span>
@@ -456,7 +476,7 @@ function App() {
       <div className="right-panel">
         {!selectedRow ? <div className="empty-state"><p>Select a row to view details</p></div> : (
           <>
-            <h3>{selectedRow.row.packet.employee_name} ({selectedRow.row.packet.emp_id}){selectedRow.row.emp_id_modified && <span style={{ marginLeft: 8, fontSize: 12, color: '#666' }} title="Emp # corrected">✏️</span>}</h3>
+            <h3>{selectedRow.row.packet.employee_name} ({selectedRow.row.packet.emp_id}){selectedRow.row.emp_id_modified && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-muted)' }} title="Emp # corrected">✏️</span>}</h3>
             <div className="detail-section">
               <h4>Emp # (for export)</h4>
               <input type="text" value={selectedRow.row.packet.emp_id} onChange={(e) => {
@@ -523,7 +543,7 @@ function App() {
                         }} style={{ width: 50, padding: 4 }} />
                       </div>
                     ))}
-                    <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>Leave unused slots blank.</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Leave unused slots blank.</p>
                     {(() => {
                       const valid = editingSegments.filter((s) => s && (s.label || s.start || s.end))
                       const liveIssues = valid.length > 0 ? validateSegments(valid, selectedRow.row.type === 'included' ? selectedRow.row.packet : undefined) : []
@@ -589,7 +609,7 @@ function App() {
                         <span className="segment-time">{s.start} → {s.end}</span>
                       </div>
                     ))}
-                    {selectedRow.row.annotation && <p style={{ marginTop: 8, fontStyle: 'italic', color: '#333' }}>{selectedRow.row.annotation}</p>}
+                    {selectedRow.row.annotation && <p style={{ marginTop: 8, fontStyle: 'italic', color: 'var(--text-secondary)' }}>{selectedRow.row.annotation}</p>}
                     <button style={{ marginTop: 12 }} onClick={() => setEditingSegments(() => {
                       const segs = selectedRow.row.segments
                       const maxSlots = selectedRow.row.type === 'excluded' ? 5 : 3
@@ -638,16 +658,16 @@ function App() {
               <p><strong>{accountedIds.length}</strong> emp accounted for in total.</p>
               {skippedList.length > 0 ? (
                 <>
-                  <p style={{ color: '#8b1a1a', fontWeight: 600 }}>You are skipping {skippedList.length} emp:</p>
+                  <p style={{ color: 'var(--accent-red)', fontWeight: 600 }}>You are skipping {skippedList.length} emp:</p>
                   <ul style={{ margin: '12px 0', paddingLeft: 20, maxHeight: 200, overflowY: 'auto' }}>
                     {skippedList.map((s) => (
                       <li key={s.id}>{s.id} — {s.name || '(name unknown)'}</li>
                     ))}
                   </ul>
-                  <p style={{ fontSize: 13, color: '#666' }}>Export anyway?</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Export anyway?</p>
                 </>
               ) : (
-                <p style={{ color: '#1a5a1a', fontWeight: 600 }}>All accounted emp are in the export.</p>
+                <p style={{ color: 'var(--accent-green)', fontWeight: 600 }}>All accounted emp are in the export.</p>
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <button className="primary" onClick={() => { doExportToCsv(data.rows, data.work_date || ''); setExportModal(null) }}>Export</button>
