@@ -81,3 +81,40 @@ tr:focus { outline: 2px solid #333; outline-offset: -1px; }
 
 .status-skipping { color: #666; font-weight: 600; }
 
+
+/* ---- Responsive: narrower windows ---- */
+@media (max-width: 1200px) {
+  .left-panel { width: 200px; padding: 12px; }
+  .right-panel { width: 300px; padding: 12px; }
+  th, td { padding: 8px 8px; font-size: 13px; }
+  .action-buttons button { padding: 8px 12px; font-size: 13px; }
+}
+
+@media (max-width: 960px) {
+  .left-panel { width: 170px; padding: 10px; }
+  .left-panel h2 { font-size: 15px; }
+  .filter-group button { font-size: 13px; padding: 6px 10px; }
+  .right-panel { width: 260px; padding: 10px; }
+  .right-panel h3 { font-size: 14px; }
+  .detail-section p { font-size: 13px; }
+  th, td { padding: 6px 6px; font-size: 12px; }
+  .bucket-badge, .type-badge { font-size: 11px; padding: 2px 6px; }
+  .segment-row { font-size: 12px; gap: 8px; padding: 6px 0; }
+  .modal { max-width: 360px; padding: 18px; }
+}
+
+@media (max-width: 768px) {
+  .app { flex-direction: column; height: auto; min-height: 100vh; }
+  .left-panel { width: 100%; border-right: none; border-bottom: 1px solid #bbb; max-height: 220px; overflow-y: auto; }
+  .center-panel { min-height: 300px; }
+  .right-panel { width: 100%; border-left: none; border-top: 1px solid #999; max-height: 50vh; }
+  .filter-group { display: flex; flex-wrap: wrap; gap: 4px; }
+  .filter-group button { width: auto; flex: 1; min-width: 80px; }
+}
+
+/* Keyboard hint for double-enter */
+.double-enter-hint {
+  font-size: 11px;
+  color: #777;
+  margin-top: 4px;
+}

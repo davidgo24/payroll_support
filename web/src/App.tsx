@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import './App.css'
 
 const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : ''
@@ -193,6 +193,7 @@ function App() {
   const [confirmApply, setConfirmApply] = useState(false)
   const [exportModal, setExportModal] = useState<{ show: true } | null>(null)
 
+
   const updateRow = useCallback((index: number, updates: Partial<Row>) => {
     if (!data) return
     const newRows = [...data.rows]
@@ -218,6 +219,34 @@ function App() {
     setConfirmApply(false)
     setSelectedIndex(idx)
   }, [])
+
+  // Double-Enter to mark row as completed
+  const lastEnterRef = useRef<{ time: number; index: number | null }>({ time: 0, index: null })
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (!data || selectedIndex === null) return
+
+      const now = Date.now()
+      const prev = lastEnterRef.current
+      if (prev.index === selectedIndex && now - prev.time < 500) {
+        e.preventDefault()
+        updateRow(selectedIndex, { status: 'completed' })
+        const nextFiltered = filteredRows.findIndex((r) => data.rows.indexOf(r) === selectedIndex)
+        if (nextFiltered >= 0 && nextFiltered < filteredRows.length - 1) {
+          const nextGlobal = data.rows.indexOf(filteredRows[nextFiltered + 1])
+          handleSelectRow(nextGlobal)
+        }
+        lastEnterRef.current = { time: 0, index: null }
+      } else {
+        lastEnterRef.current = { time: now, index: selectedIndex }
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [data, selectedIndex, filteredRows, updateRow, handleSelectRow])
 
 
   const handleProcess = async () => {
@@ -585,6 +614,7 @@ function App() {
               <button onClick={() => updateRow(selectedRow.index, { status: 'skipping' })}>Skipping hours</button>
               <button className={selectedRow.row.flagged ? 'danger' : ''} onClick={() => updateRow(selectedRow.index, { flagged: !selectedRow.row.flagged })}>{selectedRow.row.flagged ? 'Unflag' : 'Flag for review'}</button>
             </div>
+            <p className="double-enter-hint">Tip: Press Enter twice quickly to mark as completed</p>
           </>
         )}
       </div>
