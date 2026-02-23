@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import './App.css'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : ''
 
 type Segment = { label: string; start: string; end: string; code: string }
 type Packet = {
