@@ -36,6 +36,7 @@ type Row = {
   status: string
   flagged: boolean
   segments_modified?: boolean  // True when user manually edited segments
+  emp_id_modified?: boolean    // True when user corrected emp_id
 }
 
 type ProcessResponse = {
@@ -164,6 +165,7 @@ function validateSegments(segs: Segment[], packet?: Packet): string[] {
   return issues
 }
 
+const statusLabels: Record<string, string> = { pending: 'Pending', reviewed: 'Reviewed', completed: 'Completed', skipping: 'Skipping hours' }
 const bucketLabels: Record<string, string> = {
   simple: 'Simple',
   lpi: 'LPI',
@@ -189,6 +191,7 @@ function App() {
   const [workDateOverride, setWorkDateOverride] = useState('')
   const [editingSegments, setEditingSegments] = useState<Segment[] | null>(null)
   const [confirmApply, setConfirmApply] = useState(false)
+  const [exportModal, setExportModal] = useState<{ show: true } | null>(null)
 
   const updateRow = useCallback((index: number, updates: Partial<Row>) => {
     if (!data) return
@@ -316,8 +319,8 @@ function App() {
             </div>
             <div className="filter-group">
               <label>Status</label>
-              {['all', 'pending', 'reviewed', 'completed'].map((s) => (
-                <button key={s} className={statusFilter === s ? 'active' : ''} onClick={() => setStatusFilter(s)}>{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+              {['all', 'pending', 'reviewed', 'completed', 'skipping'].map((s) => (
+                <button key={s} className={statusFilter === s ? 'active' : ''} onClick={() => setStatusFilter(s)}>{s === 'skipping' ? 'Skipping hours' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
             <div className="filter-group">
@@ -362,7 +365,7 @@ function App() {
               <label>Export</label>
               <button
                 disabled={data.rows.filter((r) => r.status === 'completed' && r.segments?.length > 0).length === 0}
-                onClick={() => doExportToCsv(data.rows, data.work_date || '')}
+                onClick={() => setExportModal({ show: true })}
                 style={{ width: '100%', padding: 10 }}
               >
                 Export completed to CSV (UTF-8)
@@ -399,13 +402,13 @@ function App() {
                   return (
                     <tr key={idx} tabIndex={0} className={selectedIndex === idx ? 'selected' : ''} onClick={() => handleSelectRow(idx)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectRow(idx) } }}>
                       <td>{idx + 1}</td>
-                      <td><strong>{row.packet.emp_id}</strong></td>
+                      <td><strong>{row.packet.emp_id}</strong>{row.emp_id_modified && <span title="Emp # corrected"> ✏️</span>}</td>
                       <td>{row.packet.employee_name}</td>
                       <td><span className={`bucket-badge bucket-${row.bucket}`}>{bucketLabels[row.bucket] || row.bucket}</span></td>
                       <td>{row.cte_preferred ? <span style={{ color: '#0d5a0d', fontWeight: 700 }}>✓ CTE</span> : '—'}</td>
                       <td><span className={`type-badge type-${row.type}`}>{row.type}</span></td>
                       <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#1a1a1a' }}>{row.packet.scheduled_end_time} / {row.packet.actual_end_time}</td>
-                      <td className={`status-${row.status}`}>{row.status}</td>
+                      <td className={`status-${row.status}`}>{statusLabels[row.status] || row.status}</td>
                       <td>{row.packet.potential_bleed && (
                         <span className="bleed-badge" title="Possible PDF row bleed — verify notes">⚠️ BLEED</span>
                       )}</td>
@@ -424,7 +427,14 @@ function App() {
       <div className="right-panel">
         {!selectedRow ? <div className="empty-state"><p>Select a row to view details</p></div> : (
           <>
-            <h3>{selectedRow.row.packet.employee_name} ({selectedRow.row.packet.emp_id})</h3>
+            <h3>{selectedRow.row.packet.employee_name} ({selectedRow.row.packet.emp_id}){selectedRow.row.emp_id_modified && <span style={{ marginLeft: 8, fontSize: 12, color: '#666' }} title="Emp # corrected">✏️</span>}</h3>
+            <div className="detail-section">
+              <h4>Emp # (for export)</h4>
+              <input type="text" value={selectedRow.row.packet.emp_id} onChange={(e) => {
+                const v = e.target.value
+                updateRow(selectedRow.index, { packet: { ...selectedRow.row.packet, emp_id: v }, emp_id_modified: true })
+              }} style={{ width: '100%', padding: 8, fontSize: 14 }} placeholder="Correct emp number" />
+            </div>
             {selectedRow.row.packet.potential_bleed && (
               <div className="bleed-alert-banner">
                 <strong>⚠️ PDF ROW BLEED — Verify</strong><br />
@@ -572,11 +582,52 @@ function App() {
             <div className="action-buttons">
               <button onClick={() => updateRow(selectedRow.index, { status: 'reviewed' })}>Mark Reviewed</button>
               <button onClick={() => updateRow(selectedRow.index, { status: 'completed' })}>Mark Completed</button>
+              <button onClick={() => updateRow(selectedRow.index, { status: 'skipping' })}>Skipping hours</button>
               <button className={selectedRow.row.flagged ? 'danger' : ''} onClick={() => updateRow(selectedRow.index, { flagged: !selectedRow.row.flagged })}>{selectedRow.row.flagged ? 'Unflag' : 'Flag for review'}</button>
             </div>
           </>
         )}
       </div>
+
+      {exportModal && data && (() => {
+        const primaryIds = new Set(data.rows.map((r) => r.packet.emp_id))
+        const altIds = new Set(data.rows.filter((r) => r.packet.alternate_emp_id).map((r) => r.packet.alternate_emp_id))
+        const accountedIds = [...new Set([...primaryIds, ...altIds])]
+        const completed = data.rows.filter((r) => r.status === 'completed' && r.segments.length > 0)
+        const exportIds = new Set(completed.map((r) => r.packet.emp_id))
+        const skippedIds = accountedIds.filter((id): id is string => !!id && !exportIds.has(id))
+        const skippedList = skippedIds.map((id) => {
+          const r = data.rows.find((row) => row.packet.emp_id === id) || data.rows.find((row) => row.packet.alternate_emp_id === id)
+          return { id, name: r?.packet.employee_name || r?.packet.alternate_name || '' }
+        })
+        return (
+          <div className="modal-overlay" onClick={() => setExportModal(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Export to CSV</h3>
+              <p><strong>{exportIds.size}</strong> unique emp_ids will be exported.</p>
+              <p><strong>{accountedIds.length}</strong> emp accounted for in total.</p>
+              {skippedList.length > 0 ? (
+                <>
+                  <p style={{ color: '#8b1a1a', fontWeight: 600 }}>You are skipping {skippedList.length} emp:</p>
+                  <ul style={{ margin: '12px 0', paddingLeft: 20, maxHeight: 200, overflowY: 'auto' }}>
+                    {skippedList.map((s) => (
+                      <li key={s.id}>{s.id} — {s.name || '(name unknown)'}</li>
+                    ))}
+                  </ul>
+                  <p style={{ fontSize: 13, color: '#666' }}>Export anyway?</p>
+                </>
+              ) : (
+                <p style={{ color: '#1a5a1a', fontWeight: 600 }}>All accounted emp are in the export.</p>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button className="primary" onClick={() => { doExportToCsv(data.rows, data.work_date || ''); setExportModal(null) }}>Export</button>
+                <button onClick={() => setExportModal(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
     </div>
   )
 }

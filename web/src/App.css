@@ -78,3 +78,6 @@ tr:focus { outline: 2px solid #333; outline-offset: -1px; }
 .bleed-alert-banner strong { font-size: 15px; }
 .completeness-check { margin-top: 12px; padding: 12px; background: #f5f5f5; border-radius: 8px; border-left: 4px solid #333; font-size: 13px; }
 
+
+.status-skipping { color: #666; font-weight: 600; }
+
