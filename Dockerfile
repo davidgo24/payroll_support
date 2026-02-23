@@ -12,6 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt fastapi uvicorn
 COPY api/ ./api/
 COPY dos_primary_segment/ ./dos_primary_segment/
 COPY --from=frontend /app/web/dist ./web/dist
+COPY start.sh ./
+RUN chmod +x start.sh
 ENV PORT=8000
 EXPOSE 8000
-CMD ["sh", "-c", "python -m uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["./start.sh"]
